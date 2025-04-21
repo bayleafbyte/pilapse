@@ -27,11 +27,11 @@ picam2.configure(config)
 exposure_time = 100000      # 0.1 seconds (in microseconds)
 gain = 1.0                  # Low analog gain (ISO-like)
 
-# initial last brightness
+# initialise last brightness
 last_brightness = 100
 
 #set target brightness
-target_brightness = 110
+target_brightness = 100
 tolerance = 10 
 
 # Function to measure image brightness (0 = dark, 255 = bright)
@@ -40,7 +40,7 @@ def measure_brightness(image_path):
     return np.array(image).mean()                # Average pixel brightness
 
 # Function to decide if it's daytime based on brightness threshold
-def is_daytime(brightness, threshold=80):
+def is_daytime(brightness, threshold = target_brightness - tolerance):
     return brightness > threshold
 
 # Function to set exposure - ChatGPT 21/4/25
@@ -56,53 +56,35 @@ def adjust_exposure(current_brightness, current_exposure, min_exposure=10000, ma
     # Clamp exposure to camera limits
     return int(max(min_exposure, min(max_exposure, new_exposure)))
 
-
 # Start the time-lapse loop
 while True:
-    # Set exposure time and gain before each capture
-    picam2.set_controls({
-        "ExposureTime": exposure_time,
-        "AnalogueGain": gain
-    })
-
-#     # Focus logic
-#     if 'last_brightness' in locals() and is_daytime(last_brightness):
-#         # If it's bright: autofocus
-#         print("Daylight: Running autofocus")
-#         picam2.set_controls({"AfMode": 1})   # Continuous autofocus
-#         time.sleep(1)                        # Give time for autofocus to run
-#         picam2.set_controls({"AfMode": 0})   # Lock focus once it's found
-#     else:
-#         # If it's dark: use fixed manual focus
-#         print("Night: Fixed focus")
-#         picam2.set_controls({
-#             "AfMode": 0,                     # Disable autofocus
-#             "LensPosition": 4              # Set a fixed focus point (adjust as needed)
-#         })
-        
     # focus logic
     if last_brightness is not None and is_daytime(last_brightness):
-        print("Daylight: Running autofocus")
-        picam2.set_controls({
-            "AeEnable":True,	#auto exposure
-            "AfMode": 2})  		# Auto-once
+        print("Daylight: Autoexposure and autofocus")
+        picam2.set_controls({"AeEnable":True, "AfMode": 2})
         time.sleep(2)
-        #picam2.set_controls({"AfMode": 0})
+        # Start camera then capture the image
+        picam2.start()
+        time.sleep(2) 
     else:
         print("Night: Fixed focus")
-        picam2.set_controls({"AfMode": 0, "LensPosition": 0.47})
-
-    # Start camera, wait for exposure time, then capture the image
-    picam2.start()
-    time.sleep(exposure_time / 1_000_000 + 1)  # Wait for exposure + buffer
+        picam2.set_controls({"AfMode": 0, "LensPosition": 0.47,"ExposureTime": exposure_time,"AnalogueGain": gain})
+        # Start camera, wait for exposure time, then capture the image
+        picam2.start()
+        time.sleep(exposure_time / 1_000_000 + 1)  # Wait for exposure + buffer
+        
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     filename = f"{timestamp}.jpg"
     picam2.capture_file(filename)
+
     # Get current metadata
     metadata = picam2.capture_metadata()
+    exposure_time = metadata.get("ExposureTime", exposure_time)  # use actual value
+    gain = metadata.get("AnalogueGain", gain)
     lens_position = metadata.get("LensPosition", "NA")
     picam2.stop()
     
+    # Measure brightnss of last image
     last_brightness = measure_brightness(filename)
     
     # Log this capture to CSV
@@ -112,32 +94,15 @@ while True:
             timestamp,
             filename,
             f"{last_brightness:.1f}",
-            exposure_time,
+            f"{exposure_time:.1f}",
             f"{gain:.2f}",
             "auto" if is_daytime(last_brightness) else "fixed",
             round(lens_position, 2) if lens_position != "NA" else "NA"
         ])
 
-
     # Analyze brightness of the captured image
     last_brightness = measure_brightness(filename)
     print(f"{timestamp}: Brightness = {last_brightness:.1f}")
-
-    # Adjust exposure based on brightness to target 100
-    #target = 100            # Ideal mean brightness (tweakable)
-    #tolerance = 10          # Allowable range around target
-
-    #if last_brightness < target - tolerance and exposure_time < 111000000:
-        # Too dark ? increase exposure and gain
-        #exposure_time = int(exposure_time * 1.5)
-        #gain = min(gain * 1.1, 8.0)
-    #elif last_brightness > target + tolerance and exposure_time > 10000:
-        # Too bright ? decrease exposure and gain
-        #exposure_time = int(exposure_time / 1.5)
-        #gain = max(gain / 1.1, 1.0)
-
-    # Keep exposure time within safe limits
-    #exposure_time = min(max(exposure_time, 10000), 111000000)
 
     # set exposure
     exposure_time = adjust_exposure(last_brightness, exposure_time)
