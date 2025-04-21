@@ -30,6 +30,10 @@ gain = 1.0                  # Low analog gain (ISO-like)
 # initial last brightness
 last_brightness = 100
 
+#set target brightness
+target_brightness = 110
+tolerance = 10 
+
 # Function to measure image brightness (0 = dark, 255 = bright)
 def measure_brightness(image_path):
     image = Image.open(image_path).convert('L')  # Convert to grayscale
@@ -38,6 +42,20 @@ def measure_brightness(image_path):
 # Function to decide if it's daytime based on brightness threshold
 def is_daytime(brightness, threshold=80):
     return brightness > threshold
+
+# Function to set exposure - ChatGPT 21/4/25
+def adjust_exposure(current_brightness, current_exposure, min_exposure=10000, max_exposure=111000000):
+    error = target_brightness - current_brightness
+
+    # Use a proportional controller
+    k = 100000  # gain factor ? tweak this based on behavior
+    adjustment = k * (error / target_brightness)
+
+    new_exposure = current_exposure + adjustment
+
+    # Clamp exposure to camera limits
+    return int(max(min_exposure, min(max_exposure, new_exposure)))
+
 
 # Start the time-lapse loop
 while True:
@@ -106,20 +124,23 @@ while True:
     print(f"{timestamp}: Brightness = {last_brightness:.1f}")
 
     # Adjust exposure based on brightness to target 100
-    target = 100            # Ideal mean brightness (tweakable)
-    tolerance = 10          # Allowable range around target
+    #target = 100            # Ideal mean brightness (tweakable)
+    #tolerance = 10          # Allowable range around target
 
-    if last_brightness < target - tolerance and exposure_time < 111000000:
+    #if last_brightness < target - tolerance and exposure_time < 111000000:
         # Too dark ? increase exposure and gain
-        exposure_time = int(exposure_time * 1.5)
-        gain = min(gain * 1.1, 8.0)
-    elif last_brightness > target + tolerance and exposure_time > 10000:
+        #exposure_time = int(exposure_time * 1.5)
+        #gain = min(gain * 1.1, 8.0)
+    #elif last_brightness > target + tolerance and exposure_time > 10000:
         # Too bright ? decrease exposure and gain
-        exposure_time = int(exposure_time / 1.5)
-        gain = max(gain / 1.1, 1.0)
+        #exposure_time = int(exposure_time / 1.5)
+        #gain = max(gain / 1.1, 1.0)
 
     # Keep exposure time within safe limits
-    exposure_time = min(max(exposure_time, 10000), 111000000)
+    #exposure_time = min(max(exposure_time, 10000), 111000000)
+
+    # set exposure
+    exposure_time = adjust_exposure(last_brightness, exposure_time)
 
     # Wait 5 minutes before next shot
     time.sleep(300)
