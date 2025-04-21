@@ -58,14 +58,15 @@ def adjust_exposure(current_brightness, current_exposure, min_exposure=10000, ma
 
 # Start the time-lapse loop
 while True:
-    # focus logic
+    # focus and autoexposure logic 21/4/25
     if last_brightness is not None and is_daytime(last_brightness):
         print("Daylight: Autoexposure and autofocus")
         picam2.set_controls({"AeEnable":True, "AfMode": 2})
         time.sleep(2)
         # Start camera then capture the image
         picam2.start()
-        time.sleep(2) 
+        time.sleep(2)
+    # focus and exposure for night 21/4/25
     else:
         print("Night: Fixed focus")
         picam2.set_controls({"AfMode": 0, "LensPosition": 0.47,"ExposureTime": exposure_time,"AnalogueGain": gain})
@@ -77,7 +78,7 @@ while True:
     filename = f"{timestamp}.jpg"
     picam2.capture_file(filename)
 
-    # Get current metadata
+    # Get current metadata - get actual exposure time and gain rather than set exposure and gain 21/4/25
     metadata = picam2.capture_metadata()
     exposure_time = metadata.get("ExposureTime", exposure_time)  # use actual value
     gain = metadata.get("AnalogueGain", gain)
