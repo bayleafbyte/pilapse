@@ -111,11 +111,11 @@ while True:
 
     if last_brightness < target - tolerance and exposure_time < 111000000:
         # Too dark ? increase exposure and gain
-        exposure_time = int(exposure_time * 2)
+        exposure_time = int(exposure_time * 1.5)
         gain = min(gain * 1.1, 8.0)
     elif last_brightness > target + tolerance and exposure_time > 10000:
         # Too bright ? decrease exposure and gain
-        exposure_time = int(exposure_time / 2)
+        exposure_time = int(exposure_time / 1.5)
         gain = max(gain / 1.1, 1.0)
 
     # Keep exposure time within safe limits
