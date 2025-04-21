@@ -48,7 +48,7 @@ def adjust_exposure(current_brightness, current_exposure, min_exposure=10000, ma
     error = target_brightness - current_brightness
 
     # Use a proportional controller
-    k = 100000  # gain factor ? tweak this based on behavior
+    k = 1000000  # gain factor ? tweak this based on behavior
     adjustment = k * (error / target_brightness)
 
     new_exposure = current_exposure + adjustment
