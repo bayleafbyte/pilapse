@@ -32,7 +32,12 @@ last_brightness = 100
 
 #set target brightness
 target_brightness = 100
-tolerance = 10 
+tolerance = 20
+DAY_THRESHOLD = 110
+NIGHT_THRESHOLD = 80
+
+# Initial mode
+mode = "day"
 
 # Function to measure image brightness (0 = dark, 255 = bright)
 def measure_brightness(image_path):
@@ -48,7 +53,7 @@ def adjust_exposure(current_brightness, current_exposure, min_exposure=10000, ma
     error = target_brightness - current_brightness
 
     # Use a proportional controller
-    k = 1000000  # gain factor ? tweak this based on behavior
+    k = 10000000  # gain factor ? tweak this based on behavior
     adjustment = k * (error / target_brightness)
 
     new_exposure = current_exposure + adjustment
@@ -58,21 +63,25 @@ def adjust_exposure(current_brightness, current_exposure, min_exposure=10000, ma
 
 # Start the time-lapse loop
 while True:
-    # focus and autoexposure logic 21/4/25
-    if last_brightness is not None and is_daytime(last_brightness):
+    # Update mode based on brightness with hysteresis
+    if mode == "day" and last_brightness < NIGHT_THRESHOLD:
+        mode = "night"
+    elif mode == "night" and last_brightness > DAY_THRESHOLD:
+        mode = "day"
+    
+    # Day mode
+    if mode == "day":
         print("Daylight: Autoexposure and autofocus")
-        picam2.set_controls({"AeEnable":True, "AfMode": 2})
+        picam2.set_controls({"AeEnable": True, "AfMode": 2})
         time.sleep(2)
-        # Start camera then capture the image
         picam2.start()
         time.sleep(2)
-    # focus and exposure for night 21/4/25
+    # Night mode
     else:
         print("Night: Fixed focus")
-        picam2.set_controls({"AfMode": 0, "LensPosition": 0.47,"ExposureTime": exposure_time,"AnalogueGain": gain})
-        # Start camera, wait for exposure time, then capture the image
+        picam2.set_controls({"AfMode": 0, "LensPosition": 0.47, "ExposureTime": exposure_time, "AnalogueGain": gain})
         picam2.start()
-        time.sleep(exposure_time / 1_000_000 + 1)  # Wait for exposure + buffer
+        time.sleep(exposure_time / 1_000_000 + 1)
         
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     filename = f"{timestamp}.jpg"
@@ -102,7 +111,6 @@ while True:
         ])
 
     # Analyze brightness of the captured image
-    last_brightness = measure_brightness(filename)
     print(f"{timestamp}: Brightness = {last_brightness:.1f}")
 
     # set exposure
